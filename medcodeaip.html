@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedCodeAI™ AI Billing Platform</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { font-family: 'Inter', sans-serif; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .code-item { transition: all 0.2s; cursor: pointer; }
+        .code-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .status-loading { background-color: #fef3c7; color: #92400e; }
+        .status-error { background-color: #fee2e2; color: #991b1b; }
+        .status-success { background-color: #d1fae5; color: #065f46; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="container min-h-screen">
+        <header class="text-center py-6 border-b border-indigo-200">
+            <h1 class="text-4xl font-extrabold text-indigo-800">MedCodeAI™</h1>
+            <p class="text-indigo-600 mt-2 text-lg">AI-Powered Coding and Immutable Blockchain Billing Ledger</p>
+        </header>
+
+        <div class="grid md:grid-cols-2 gap-8 mt-8">
+            <!-- Input Panel -->
+            <div class="bg-white p-6 rounded-xl shadow-2xl">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">1. Clinical Encounter Notes</h2>
+                
+                <!-- NEW INSTRUCTIONS ADDED HERE -->
+                <div class="mb-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-semibold text-indigo-700 mb-1">✍️ Tips for Generating Codes:</p>
+                    <ul class="list-disc list-inside text-xs text-gray-600 space-y-1">
+                        <li>Include **accurate keywords** to trigger the AI (e.g., **tetanus**, **appendectomy**, **annual physical**, **fracture**, **biopsy**, **sore throat**).</li>
+                        <li>For **surgeries/procedures** (like *appendectomy*), mention **duration** or **time** (e.g., "time 45 minutes") to avoid a compliance flag.</li>
+                        <li>For **injuries** (like *fracture*), mention **imaging** or **X-ray** confirmation.</li>
+                        <li>For **lesions**, mention **pathology** details or **size** (*biopsy* scenario).</li>
+                        <li>For a simple **cold/cough**, use keywords like **sore throat**.</li>
+                    </ul>
+                </div>
+                
+                <textarea
+                    id="notes-input"
+                    class="w-full p-4 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition duration-150 resize-none text-sm"
+                    rows="12"
+                    placeholder="Paste or type patient notes, operative reports, or discharge summaries here..."
+                    oninput="clearState();"
+                ></textarea>
+                
+                <button
+                    id="run-ai-button"
+                    onclick="triggerAI()"
+                    class="mt-4 w-full px-6 py-3 text-lg font-bold rounded-xl text-white transition duration-200 bg-indigo-600 hover:bg-indigo-700 shadow-md hover:shadow-lg"
+                >
+                    Run AI Coding & Compliance Check
+                </button>
+                <div id="ai-loading-indicator" class="hidden mt-4 w-full px-6 py-3 text-lg font-bold rounded-xl text-white transition duration-200 bg-indigo-400 cursor-not-allowed text-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    AI Coding Engine Running...
+                </div>
+            </div>
+
+            <!-- Output and Billing Panel -->
+            <div>
+                <!-- AI Results -->
+                <div class="bg-gray-50 p-6 rounded-xl shadow-inner mb-6 min-h-[300px]">
+                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">2. AI-Suggested Codes (Simulated)</h2>
+                    <div id="suggested-codes-output">
+                        <p class="text-gray-500 italic">No codes suggested yet. Enter clinical notes above and click 'Run AI'.</p>
+                    </div>
+                </div>
+
+                <!-- Blockchain Billing -->
+                <div class="bg-white p-6 rounded-xl shadow-2xl">
+                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">3. Blockchain Audit & Submission</h2>
+
+                    <div id="claim-status" class="p-3 mb-4 rounded-lg font-bold text-center bg-gray-200 text-gray-700">
+                        Ready for AI Coding
+                    </div>
+                    
+                    <button
+                        id="submit-claim-button"
+                        onclick="submitClaim()"
+                        disabled
+                        class="mt-2 w-full px-6 py-3 text-lg font-bold rounded-xl text-white transition duration-200 bg-green-600 hover:bg-green-700 shadow-md hover:shadow-lg opacity-50 cursor-not-allowed"
+                    >
+                        Submit Claim & Create Immutable Ledger
+                    </button>
+                    
+                    <div id="blockchain-hash-output">
+                        <!-- Hash will be injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Global State ---
+        let suggestedCodes = [];
+        let isLoading = false;
+        let isSubmitting = false;
+
+        // --- DOM Elements ---
+        const notesInput = document.getElementById('notes-input');
+        const runAiButton = document.getElementById('run-ai-button');
+        const aiLoadingIndicator = document.getElementById('ai-loading-indicator');
+        const suggestedCodesOutput = document.getElementById('suggested-codes-output');
+        const claimStatus = document.getElementById('claim-status');
+        const submitClaimButton = document.getElementById('submit-claim-button');
+        const blockchainHashOutput = document.getElementById('blockchain-hash-output');
+
+        /**
+         * Updates the UI based on the current application state.
+         */
+        function updateUI() {
+            const isCodesPresent = suggestedCodes.length > 0;
+            const isClaimSubmitted = blockchainHashOutput.innerHTML !== '';
+
+            // 1. Notes Input and AI Button
+            if (isLoading) {
+                runAiButton.classList.add('hidden');
+                aiLoadingIndicator.classList.remove('hidden');
+            } else {
+                runAiButton.classList.remove('hidden');
+                aiLoadingIndicator.classList.add('hidden');
+                
+                // Disable button if notes are empty or loading
+                const isDisabled = !notesInput.value || isLoading;
+                runAiButton.disabled = isDisabled;
+                runAiButton.classList.toggle('bg-indigo-400', isDisabled);
+                runAiButton.classList.toggle('hover:bg-indigo-700', !isDisabled);
+                runAiButton.classList.toggle('cursor-not-allowed', isDisabled);
+            }
+
+            // 2. Suggested Codes Output
+            if (suggestedCodes.length === 0) {
+                suggestedCodesOutput.innerHTML = '<p class="text-gray-500 italic">No codes suggested yet. Enter clinical notes above and click \'Run AI\'.</p>';
+            } else {
+                suggestedCodesOutput.innerHTML = suggestedCodes.map(code => {
+                    const statusColor = code.complianceFlag ? 'border-red-500' : 'border-green-500';
+                    const complianceWarning = code.complianceFlag 
+                        ? `<p class="text-xs font-bold text-red-600 mt-1">${code.complianceFlag}</p>` 
+                        : '';
+                    
+                    return `
+                        <div class="code-item flex justify-between items-center bg-white p-3 mb-2 rounded-lg border-l-4 ${statusColor}">
+                            <div>
+                                <strong class="text-indigo-800">${code.type}: ${code.code}</strong>
+                                <p class="text-sm text-gray-600">${code.description}</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs font-mono bg-gray-200 px-2 py-1 rounded-full">${code.confidence.toFixed(1)}%</span>
+                                ${complianceWarning}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            // 3. Claim Status and Submit Button
+            let statusText = claimStatus.textContent.trim();
+            claimStatus.className = 'p-3 mb-4 rounded-lg font-bold text-center';
+
+            if (isLoading || isSubmitting) {
+                claimStatus.classList.add('status-loading');
+                statusText = isSubmitting ? 'Processing Smart Contract...' : 'AI Coding Engine Analyzing Notes...';
+            } else if (statusText.includes('ERROR')) {
+                claimStatus.classList.add('status-error');
+            } else if (isClaimSubmitted) {
+                claimStatus.classList.add('status-success');
+                statusText = 'CLAIM SUBMITTED: Secured to Immutable Audit Ledger!';
+            } else if (suggestedCodes.some(c => c.complianceFlag)) {
+                claimStatus.classList.add('bg-yellow-200', 'text-yellow-800');
+                statusText = 'Review Required: Compliance Flagged';
+            } else if (isCodesPresent) {
+                claimStatus.classList.add('bg-green-100', 'text-green-700');
+                statusText = 'Codes Generated. Ready for Submission.';
+            } else {
+                claimStatus.classList.add('bg-gray-200', 'text-gray-700');
+                statusText = 'Ready for AI Coding';
+            }
+            claimStatus.textContent = statusText;
+            
+            // Submit Button appearance
+            const submitDisabled = !isCodesPresent || isSubmitting || isClaimSubmitted;
+            submitClaimButton.disabled = submitDisabled;
+            submitClaimButton.classList.toggle('opacity-50', submitDisabled);
+            submitClaimButton.classList.toggle('cursor-not-allowed', submitDisabled);
+            submitClaimButton.classList.toggle('bg-green-400', isSubmitting || isClaimSubmitted);
+            submitClaimButton.classList.toggle('bg-green-600', !(isSubmitting || isClaimSubmitted));
+            submitClaimButton.classList.toggle('hover:bg-green-700', !(isSubmitting || isClaimSubmitted));
+            
+            submitClaimButton.textContent = isClaimSubmitted ? 'CLAIM SUBMITTED' : 'Submit Claim & Create Immutable Ledger';
+        }
+
+        /**
+         * Resets the code suggestion and blockchain state.
+         */
+        function clearState() {
+            suggestedCodes = [];
+            blockchainHashOutput.innerHTML = '';
+            updateUI();
+        }
+
+        /**
+         * MOCK AI Logic: Simulates calling the backend AI engine with dynamic, variable output.
+         */
+        async function triggerAI() {
+            const notesContent = notesInput.value.toLowerCase();
+            if (!notesContent || isLoading) return;
+
+            isLoading = true;
+            clearState();
+            claimStatus.textContent = 'AI Coding Engine Analyzing Notes...';
+            updateUI();
+
+            // Simulate network latency (3 seconds)
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // --- MOCK DYNAMIC AI LOGIC ---
+            let codes = [];
+            let scenarioFound = true;
+
+            if (notesContent.includes('tetanus') || notesContent.includes('vaccine')) {
+                // Simple Tetanus/Immunization scenario
+                codes.push({ type: 'CPT', code: '90715', description: 'Tetanus, diphtheria toxoids and acellular pertussis vaccine (Tdap)', confidence: 99.5 });
+                codes.push({ type: 'CPT', code: '90471', description: 'Immunization administration (procedure)', confidence: 99.0 });
+                codes.push({ type: 'ICD-10', code: 'Z23', description: 'Encounter for immunization', confidence: 100.0 });
+                
+            } else if (notesContent.includes('appendectomy')) {
+                codes.push({ type: 'CPT', code: '44970', description: 'Laparoscopic appendectomy', confidence: 98.7 });
+                codes.push({ type: 'ICD-10', code: 'K35.80', description: 'Acute appendicitis, unspecified', confidence: 99.2 });
+                
+                if (!notesContent.includes('time') || notesContent.length < 150) {
+                    codes[0].complianceFlag = 'Missing minimum documentation details (Procedure Duration). Potential denial risk (Payer Rule 001A).';
+                }
+
+            } else if (notesContent.includes('annual physical')) {
+                codes.push({ type: 'CPT', code: '99395', description: 'Periodic preventive medicine reevaluation, established patient', confidence: 95.5 });
+                codes.push({ type: 'ICD-10', code: 'Z00.00', description: 'Encounter for general adult medical examination without abnormal findings', confidence: 97.0 });
+
+            } else if (notesContent.includes('fracture') || notesContent.includes('broken arm')) {
+                codes.push({ type: 'CPT', code: '25505', description: 'Closed treatment of radial shaft fracture', confidence: 91.0 });
+                codes.push({ type: 'ICD-10', code: 'S52.321A', description: 'Displaced fracture of shaft of right radius, initial encounter', confidence: 89.5 });
+                codes.push({ type: 'Modifier', code: 'RT', description: 'Right side procedure modifier', confidence: 100.0 });
+                
+                if (!notesContent.includes('imaging') && !notesContent.includes('x-ray')) {
+                    codes[0].complianceFlag = 'Diagnostic imaging documentation missing. Critical for fracture coding.';
+                }
+
+            } else if (notesContent.includes('sore throat') || notesContent.includes('cough') || notesContent.includes('cold')) {
+                codes.push({ type: 'CPT', code: '99213', description: 'Office or other outpatient visit, established patient, low complexity', confidence: 93.1 });
+                codes.push({ type: 'ICD-10', code: 'J02.9', description: 'Acute pharyngitis, unspecified', confidence: 92.5 });
+            
+            } else if (notesContent.includes('biopsy') && notesContent.includes('lesion')) {
+                // Complex scenario: generates 4 codes
+                codes.push({ type: 'CPT', code: '11102', description: 'Punch biopsy of single lesion', confidence: 88.0 });
+                codes.push({ type: 'CPT', code: '17110', description: 'Destruction of benign lesions, up to 14 lesions', confidence: 85.5 });
+                codes.push({ type: 'ICD-10', code: 'D49.2', description: 'Neoplasm of uncertain behavior of bone, cartilage, and soft tissue', confidence: 87.2 });
+                codes.push({ type: 'Modifier', code: '59', description: 'Distinct procedural service', confidence: 90.0 });
+
+                if (!notesContent.includes('pathology') || !notesContent.includes('size')) {
+                    codes[0].complianceFlag = 'Insufficient detail: Missing pathology report and/or lesion size/location for precise coding.';
+                }
+            } else {
+                // Default error for notes with no recognizable keywords
+                scenarioFound = false;
+                claimStatus.textContent = 'AI ERROR: Notes are too vague or lack necessary keywords for accurate coding. Please add details like "fracture," "physical," or "biopsy."';
+            }
+
+            // --- END MOCK DYNAMIC AI LOGIC ---
+
+            suggestedCodes = codes;
+            isLoading = false;
+            
+            if (scenarioFound && codes.length > 0) {
+                const complianceFlagged = codes.some(c => c.complianceFlag);
+                claimStatus.textContent = complianceFlagged ? 'Review Required: Compliance Flagged' : 'Codes Generated. Ready for Submission.';
+            }
+            updateUI();
+        }
+
+        /**
+         * MOCK BLOCKCHAIN/BILLING API CALL: Simulates submitting the claim to the ledger.
+         */
+        async function submitClaim() {
+            if (suggestedCodes.length === 0 || isSubmitting || blockchainHashOutput.innerHTML !== '') return;
+
+            isSubmitting = true;
+            claimStatus.textContent = 'Initiating Smart Contract and Claim Submission...';
+            updateUI();
+
+            // Simulate blockchain consensus (5 seconds)
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // --- MOCK BLOCKCHAIN/BILLING LOGIC ---
+            const claimPayload = {
+                codes: suggestedCodes,
+                patient_id: 'Mock_PID_12345',
+                timestamp: new Date().toISOString()
+            };
+            
+            const hashData = JSON.stringify(claimPayload);
+            const mockHash = sha256(hashData); 
+            
+            // Render Hash Output
+            blockchainHashOutput.innerHTML = `
+                <div class="mt-4 p-4 bg-gray-100 rounded-lg text-sm break-all">
+                    <p class="font-semibold text-indigo-700 mb-1">Blockchain Audit Hash:</p>
+                    <code>${mockHash}</code>
+                    <p class="text-xs text-gray-500 mt-1">This hash secures the claim metadata on the decentralized ledger.</p>
+                </div>
+            `;
+            // --- END MOCK BLOCKCHAIN/BILLING LOGIC ---
+            
+            isSubmitting = false;
+            claimStatus.textContent = 'CLAIM SUBMITTED: Secured to Immutable Audit Ledger!';
+            updateUI();
+        }
+        
+        // Simple Mock SHA-256 for concept
+        function sha256(str) {
+            let hash = 0;
+            if (str.length === 0) return '0000000000000000000000000000000000000000000000000000000000000000';
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash |= 0; // Convert to 32bit integer
+            }
+            return 'BC-' + Math.abs(hash).toString(16).padStart(30, '0') + '-' + Date.now().toString(16).slice(-10);
+        }
+
+        // --- Initialization ---
+        window.onload = function() {
+            // Set a default example note (a new simple one)
+            notesInput.value = '16-year-old patient presented for routine wound check. Given a Tdap (tetanus, diphtheria, and acellular pertussis) vaccine as part of standard care. Injection site clean, patient advised on potential minor muscle soreness.';
+            updateUI();
+        }
+
+    </script>
+
+</body>
+</html>
